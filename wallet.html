@@ -364,6 +364,49 @@ function webauthnAvailable() {
          typeof navigator.credentials?.create === 'function';
 }
 
+async function restorePasskey() {
+  if (!webauthnAvailable()) throw new Error('Passkeys are not supported on this device.');
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  // We also ask for PRF right away so we can verify this is a valid Qoin passkey
+  const testSalt = new Uint8Array(await crypto.subtle.digest(
+    'SHA-256', new TextEncoder().encode('qoin-restore-check')
+  ));
+
+  let assertion;
+  try {
+    assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        rpId: location.hostname,
+        userVerification: 'required',
+        timeout: 60000,
+        // No allowCredentials — the browser offers discoverable passkeys for this origin
+        extensions: { prf: { eval: { first: testSalt } } }
+      }
+    });
+  } catch (err) {
+    if (err?.name === 'NotAllowedError') {
+      throw new Error('No existing passkey found, or the prompt was dismissed. Use "Set up with Face ID" for first-time setup.');
+    }
+    throw err;
+  }
+  if (!assertion) throw new Error('Restore cancelled.');
+
+  const prf = assertion.getClientExtensionResults?.()?.prf?.results?.first;
+  if (!prf) {
+    throw new Error(
+      'This passkey does not expose the PRF extension, so Qoin cannot derive keys from it. ' +
+      'It may be from a different app. Try "Set up with Face ID" to create a fresh Qoin passkey.'
+    );
+  }
+
+  state.credentialId = b64urlEncode(new Uint8Array(assertion.rawId));
+  if (!state.userId) state.userId = b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
+  state.wallets = state.wallets || [];
+  saveState();
+  return true;
+}
+
 async function registerPasskey() {
   if (!webauthnAvailable()) throw new Error('Passkeys are not supported on this device.');
   const userId = crypto.getRandomValues(new Uint8Array(16));
@@ -670,14 +713,16 @@ function renderWelcome(opts) {
       <p class="mt-16">A wallet on a single file.<br>Your face is the key.<br>One Face ID, every wallet.</p>
       <div class="mt-32"></div>
       <button class="btn primary" id="start">Set up with Face ID</button>
-      <p class="fine mt-16">
-        No accounts. No passwords. No seed phrases.<br>
-        Lose your phone, lose your money. This is a wallet, not a bank.
+      <button class="btn" id="restore" style="margin-top:10px;">Restore with Face ID</button>
+      <p class="fine mt-16" style="text-align:left;max-width:340px;margin-left:auto;margin-right:auto;">
+        <strong style="color:var(--dim);">First time?</strong> Tap <em style="color:var(--dim)">Set up</em> to create a new passkey in Secure Enclave.<br><br>
+        <strong style="color:var(--dim);">Coming back?</strong> Tap <em style="color:var(--dim)">Restore</em>. Your passkey stays in Secure Enclave even when you lock. Re-enter your wallet names to see their addresses return.
       </p>
-      ${pending ? `<p class="fine mt-24" style="color:#7fa7ff">A proposal is waiting. Set up Qoin to review it.</p>` : ''}
+      ${pending ? `<p class="fine mt-16" style="color:#7fa7ff">A proposal is waiting. Set up or restore Qoin to review it.</p>` : ''}
     </div>
   `);
   app.appendChild(view);
+
   view.querySelector('#start').onclick = async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
@@ -689,6 +734,21 @@ function renderWelcome(opts) {
       toast(err.message || 'Setup failed', 'err');
       btn.disabled = false;
       btn.textContent = 'Set up with Face ID';
+    }
+  };
+
+  view.querySelector('#restore').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
+    try {
+      await restorePasskey();
+      toast('Restored. Re-enter your wallet names.', 'ok');
+      render();
+    } catch (err) {
+      toast(err.message || 'Restore failed', 'err');
+      btn.disabled = false;
+      btn.textContent = 'Restore with Face ID';
     }
   };
 }
@@ -710,9 +770,13 @@ function renderWalletList() {
           Works on Ethereum and Base. Agents can only propose &mdash; you are the only signer.
         </p>
       </div>
-      <div class="fine center mt-24">
-        ${escapeHtml(location.hostname || 'qoin')} &nbsp;·&nbsp; <span class="link" id="wipe">Wipe device</span>
-      </div>
+
+      <button class="btn" id="lock" style="margin-top:20px;">Lock Qoin</button>
+      <p class="fine center mt-16" style="padding:0 20px;">
+        Locking hides your wallets from this device.<br>
+        Your funds stay safe on Ethereum. Unlock anytime with Face ID.
+      </p>
+      <div class="fine center mt-24 faint">${escapeHtml(location.hostname || 'qoin')}</div>
     </div>
   `);
   app.appendChild(view);
@@ -746,8 +810,8 @@ function renderWalletList() {
   }
 
   view.querySelector('#add').onclick = showCreateWallet;
-  view.querySelector('#wipe').onclick = () => {
-    const ok = confirm('Wipe Qoin from this device?\n\nThis removes the passkey registration and wallet list from local storage. Your wallets themselves are not deleted — they always exist on Ethereum. You can re-create them on this or any device using the same Apple ID and wallet names.');
+  view.querySelector('#lock').onclick = () => {
+    const ok = confirm('Lock Qoin on this device?\n\nYour wallets are hidden but still exist on Ethereum. Anyone opening this page sees a fresh welcome screen — they will not know you have a wallet here. Unlock anytime with Face ID by tapping "Restore."\n\nYou will need to re-enter your wallet names when you return.');
     if (ok) {
       localStorage.removeItem(STORAGE_KEY);
       state = loadState();
