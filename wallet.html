@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Qoin</title>
+<link rel="preconnect" href="https://rsms.me">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+:root{
+  --bg:#000;
+  --card:#111;
+  --card-hi:#161616;
+  --border:rgba(255,255,255,.07);
+  --border-hi:rgba(255,255,255,.14);
+  --text:#fff;
+  --dim:rgba(255,255,255,.55);
+  --faint:rgba(255,255,255,.3);
+  --accent:#2563eb;
+  --accent-hi:#1d4ed8;
+  --danger:#ef4444;
+  --success:#22c55e;
+  --r:14px;
+  --r-sm:10px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+}
+@supports(font-variation-settings:normal){:root{--font:'Inter var','Inter',-apple-system,system-ui,sans-serif;}}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  font-feature-settings:'cv11','ss01';
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+  min-height:100vh;
+  font-size:15px;
+  line-height:1.45;
+  overscroll-behavior-y:none;
+}
+body{
+  padding:max(env(safe-area-inset-top),24px) 20px max(env(safe-area-inset-bottom),24px);
+  max-width:560px;
+  margin:0 auto;
+}
+h1,h2,h3{font-weight:800;letter-spacing:-.03em;line-height:1.05;}
+h1{font-size:44px;letter-spacing:-.045em;}
+h2{font-size:26px;letter-spacing:-.035em;}
+h3{font-size:18px;letter-spacing:-.02em;font-weight:700;}
+p{color:var(--dim);}
+a{color:var(--text);text-decoration:none;}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;background:none;border:none;outline:none;}
+button{cursor:pointer;}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-feature-settings:normal;}
+.dim{color:var(--dim);}
+.faint{color:var(--faint);}
+.center{text-align:center;}
+.row{display:flex;align-items:center;gap:12px;}
+.col{display:flex;flex-direction:column;gap:12px;}
+.sp{justify-content:space-between;}
+.gap-4{gap:4px;}.gap-6{gap:6px;}.gap-8{gap:8px;}.gap-16{gap:16px;}.gap-20{gap:20px;}.gap-24{gap:24px;}
+.mt-8{margin-top:8px;}.mt-16{margin-top:16px;}.mt-24{margin-top:24px;}.mt-32{margin-top:32px;}
+.hidden{display:none !important;}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:28px;
+}
+.logo{font-size:24px;font-weight:800;letter-spacing:-.045em;}
+.logo::after{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:4px;margin-bottom:4px;vertical-align:middle;}
+.iconbtn{
+  width:40px;height:40px;border-radius:var(--r-sm);
+  background:var(--card);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:400;color:var(--dim);
+  transition:background .15s,color .15s,border-color .15s;
+}
+.iconbtn:hover{background:var(--card-hi);color:var(--text);border-color:var(--border-hi);}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:20px;
+}
+
+.wallet-row{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:18px 20px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+.wallet-row:hover,.wallet-row:active{background:var(--card-hi);border-color:var(--border-hi);}
+.wallet-row .name{font-weight:700;font-size:17px;letter-spacing:-.01em;}
+.wallet-row .addr{font-size:12px;color:var(--faint);margin-top:3px;}
+.wallet-row .chev{color:var(--faint);font-size:18px;}
+
+.balance-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+}
+.balance-row .label{display:flex;align-items:center;gap:10px;}
+.chain-pill{
+  font-size:11px;padding:3px 8px;border-radius:999px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600;
+}
+.chain-pill.base{color:#4fa3ff;border-color:rgba(79,163,255,.2);background:rgba(79,163,255,.06);}
+.chain-pill.ethereum{color:#c8b3ff;border-color:rgba(200,179,255,.2);background:rgba(200,179,255,.06);}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:16px 20px;
+  border-radius:var(--r);
+  font-weight:600;font-size:16px;letter-spacing:-.01em;
+  border:1px solid var(--border);
+  background:var(--card);
+  transition:background .15s,border-color .15s,color .15s,transform .08s;
+  width:100%;
+  text-align:center;
+}
+.btn:hover{background:var(--card-hi);border-color:var(--border-hi);}
+.btn:active{transform:scale(.99);}
+.btn.primary{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+}
+.btn.primary:hover{background:var(--accent-hi);border-color:var(--accent-hi);}
+.btn.danger{color:var(--danger);border-color:rgba(239,68,68,.25);}
+.btn.danger:hover{background:rgba(239,68,68,.08);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+.field{display:flex;flex-direction:column;gap:8px;}
+.field label{font-size:13px;color:var(--dim);font-weight:500;letter-spacing:-.005em;}
+.field input,.field select,.field textarea{
+  padding:16px 18px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  font-size:16px;
+  color:var(--text);
+  transition:border-color .15s,background .15s;
+  width:100%;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);background:var(--card-hi);}
+.field input.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:13px;}
+.field textarea{resize:vertical;min-height:80px;font-family:inherit;}
+.field .hint{font-size:12px;color:var(--faint);}
+
+.overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  z-index:100;
+  display:flex;align-items:flex-end;justify-content:center;
+  animation:fade .2s ease;
+}
+.sheet{
+  background:var(--bg);
+  border-top:1px solid var(--border-hi);
+  border-radius:20px 20px 0 0;
+  padding:24px 20px max(env(safe-area-inset-bottom),28px);
+  width:100%;
+  max-width:560px;
+  max-height:90vh;
+  overflow-y:auto;
+  animation:slide .25s cubic-bezier(.2,.8,.2,1);
+}
+.sheet-handle{
+  width:36px;height:4px;background:var(--border-hi);border-radius:2px;
+  margin:0 auto 20px;
+}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes slide{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+.proposal-amount{
+  font-size:48px;font-weight:800;letter-spacing:-.04em;line-height:1;
+  margin:20px 0 8px;
+}
+.proposal-amount .unit{font-size:24px;color:var(--dim);margin-left:8px;letter-spacing:-.02em;}
+.proposal-row{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+  padding:14px 0;
+  border-bottom:1px solid var(--border);
+}
+.proposal-row:last-child{border-bottom:none;}
+.proposal-row .k{color:var(--dim);font-size:14px;flex-shrink:0;}
+.proposal-row .v{font-size:14px;text-align:right;word-break:break-all;font-weight:500;}
+
+.toast{
+  position:fixed;left:50%;top:24px;transform:translateX(-50%);
+  background:var(--card);border:1px solid var(--border-hi);border-radius:var(--r-sm);
+  padding:12px 18px;font-size:14px;z-index:200;
+  animation:tin .2s ease;max-width:calc(100vw - 40px);
+}
+.toast.err{border-color:rgba(239,68,68,.4);color:#ffb4b4;}
+.toast.ok{border-color:rgba(34,197,94,.4);color:#b4ffc5;}
+@keyframes tin{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+.hero{padding:40px 0 20px;text-align:center;}
+.hero h1{margin-bottom:16px;}
+.hero p{font-size:17px;max-width:380px;margin:0 auto;line-height:1.5;}
+.hero .tag{
+  display:inline-block;font-size:11px;padding:6px 12px;border-radius:999px;
+  background:rgba(37,99,235,.1);color:#7fa7ff;border:1px solid rgba(37,99,235,.2);
+  letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+  margin-bottom:28px;
+}
+
+.empty{
+  padding:56px 24px;text-align:center;
+  background:var(--card);border:1px dashed var(--border);border-radius:var(--r);
+}
+.empty p{margin-bottom:20px;}
+
+.section-label{
+  font-size:11px;color:var(--faint);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:600;
+  margin:24px 4px 12px;
+}
+
+.link{color:var(--accent);cursor:pointer;}
+.link:hover{text-decoration:underline;}
+
+.fine{font-size:12px;color:var(--faint);line-height:1.5;}
+
+.spinner{
+  width:16px;height:16px;border:2px solid rgba(255,255,255,.15);
+  border-top-color:var(--text);border-radius:50%;animation:spin .8s linear infinite;
+  display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.addr-chip{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;font-family:ui-monospace,'SF Mono',Menlo,monospace;
+  font-size:13px;word-break:break-all;line-height:1.5;cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+.addr-chip:hover{background:var(--card-hi);border-color:var(--border-hi);}
+.addr-chip .copy-hint{color:var(--faint);font-size:11px;margin-top:8px;font-family:var(--font);letter-spacing:.05em;text-transform:uppercase;font-weight:600;}
+
+::-webkit-scrollbar{width:0;height:0;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(() => {
+'use strict';
+
+// ============================================================
+//  CONSTANTS
+// ============================================================
+
+const CHAINS = {
+  ethereum: {
+    id: 1,
+    name: 'Ethereum',
+    symbol: 'ETH',
+    rpc: 'https://eth.llamarpc.com',
+    explorer: 'https://etherscan.io'
+  },
+  base: {
+    id: 8453,
+    name: 'Base',
+    symbol: 'ETH',
+    rpc: 'https://mainnet.base.org',
+    explorer: 'https://basescan.org'
+  }
+};
+
+const TOKENS = {
+  USDC: {
+    decimals: 6,
+    addresses: {
+      ethereum: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+      base:     '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
+    }
+  }
+};
+
+const ERC20_ABI = [
+  'function transfer(address to, uint256 amount) returns (bool)',
+  'function balanceOf(address owner) view returns (uint256)',
+  'function decimals() view returns (uint8)'
+];
+
+const STORAGE_KEY = 'qoin.v1';
+const PRF_SALT_PREFIX = 'qoin-eth-v1:';
+
+// ============================================================
+//  STATE
+// ============================================================
+
+let state = loadState();
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return {
+      userId: s?.userId || null,
+      credentialId: s?.credentialId || null,
+      wallets: Array.isArray(s?.wallets) ? s.wallets : []
+    };
+  } catch {
+    return { userId: null, credentialId: null, wallets: [] };
+  }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// ============================================================
+//  ENCODING
+// ============================================================
+
+function b64urlEncode(bytes) {
+  const bin = String.fromCharCode(...new Uint8Array(bytes));
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlDecode(str) {
+  const pad = '='.repeat((4 - str.length % 4) % 4);
+  const s = (str + pad).replace(/-/g,'+').replace(/_/g,'/');
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function hex(bytes) {
+  return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// ============================================================
+//  WEBAUTHN + KEY DERIVATION
+// ============================================================
+
+function webauthnAvailable() {
+  return typeof window.PublicKeyCredential !== 'undefined' &&
+         typeof navigator.credentials?.create === 'function';
+}
+
+async function registerPasskey() {
+  if (!webauthnAvailable()) throw new Error('Passkeys are not supported on this device.');
+  const userId = crypto.getRandomValues(new Uint8Array(16));
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+  const credential = await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: 'Qoin', id: location.hostname },
+      user: {
+        id: userId,
+        name: 'qoin@' + location.hostname,
+        displayName: 'Qoin'
+      },
+      pubKeyCredParams: [
+        { alg: -7,   type: 'public-key' },
+        { alg: -257, type: 'public-key' }
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        residentKey: 'required',
+        userVerification: 'required'
+      },
+      timeout: 60000,
+      extensions: { prf: {} }
+    }
+  });
+  if (!credential) throw new Error('Passkey creation was cancelled.');
+
+  state.userId = b64urlEncode(userId);
+  state.credentialId = b64urlEncode(new Uint8Array(credential.rawId));
+  saveState();
+  return true;
+}
+
+async function computeSalt(walletName) {
+  const buf = new TextEncoder().encode(PRF_SALT_PREFIX + walletName);
+  const digest = await crypto.subtle.digest('SHA-256', buf);
+  return new Uint8Array(digest);
+}
+
+async function deriveKeyForWallet(walletName) {
+  if (!state.credentialId) throw new Error('No passkey. Please set up Qoin first.');
+  const salt = await computeSalt(walletName);
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const credId = b64urlDecode(state.credentialId);
+
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      userVerification: 'required',
+      timeout: 60000,
+      allowCredentials: [{
+        type: 'public-key',
+        id: credId,
+        transports: ['internal','hybrid']
+      }],
+      extensions: { prf: { eval: { first: salt } } }
+    }
+  });
+  if (!assertion) throw new Error('Face ID cancelled.');
+
+  const ext = assertion.getClientExtensionResults?.();
+  const prf = ext?.prf?.results?.first;
+  if (!prf) {
+    throw new Error(
+      'This device does not support the WebAuthn PRF extension. ' +
+      'Qoin needs iOS 18+ Safari, or a recent Chrome/Edge with a platform authenticator.'
+    );
+  }
+  const keyBytes = new Uint8Array(prf);
+  if (keyBytes.length !== 32) throw new Error('Invalid PRF output length.');
+  return hex(keyBytes);
+}
+
+// ============================================================
+//  WALLET OPS
+// ============================================================
+
+function normalizeName(raw) {
+  return String(raw||'').trim().toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g,'-').replace(/^-|-$/g,'');
+}
+
+function findWallet(name) {
+  const n = normalizeName(name);
+  return state.wallets.find(w => w.name === n);
+}
+
+async function createWallet(rawName) {
+  const name = normalizeName(rawName);
+  if (!name || name.length < 1 || name.length > 32) {
+    throw new Error('Name must be 1–32 letters, digits or dashes.');
+  }
+  if (findWallet(name)) throw new Error('A wallet named "' + name + '" already exists.');
+
+  const key = await deriveKeyForWallet(name);
+  const wallet = new ethers.Wallet(key);
+  const address = wallet.address;
+
+  state.wallets.push({ name, address, createdAt: Date.now() });
+  saveState();
+  return { name, address };
+}
+
+function getProvider(chainKey) {
+  const c = CHAINS[chainKey];
+  if (!c) throw new Error('Unknown chain: ' + chainKey);
+  return new ethers.JsonRpcProvider(c.rpc, c.id);
+}
+
+async function fetchBalances(address) {
+  const out = [];
+  for (const ck of Object.keys(CHAINS)) {
+    const provider = getProvider(ck);
+    try {
+      const [nativeBal, usdcBal] = await Promise.all([
+        provider.getBalance(address).catch(() => 0n),
+        (async () => {
+          const tok = TOKENS.USDC.addresses[ck];
+          const c = new ethers.Contract(tok, ERC20_ABI, provider);
+          try { return await c.balanceOf(address); } catch { return 0n; }
+        })()
+      ]);
+      out.push({
+        chain: ck, chainName: CHAINS[ck].name,
+        symbol: CHAINS[ck].symbol,
+        native: ethers.formatUnits(nativeBal, 18),
+        usdc: ethers.formatUnits(usdcBal, TOKENS.USDC.decimals)
+      });
+    } catch (e) {
+      out.push({ chain: ck, chainName: CHAINS[ck].name, symbol: CHAINS[ck].symbol, error: e.message });
+    }
+  }
+  return out;
+}
+
+// ============================================================
+//  PROPOSAL FORMAT + URL
+// ============================================================
+// Proposal JSON:
+// { v:1, chain:'base'|'ethereum', to:'0x...', value:'<smallest units, decimal string>',
+//   token?:'USDC' or ERC-20 contract, memo?:string, data?:'0x...', from?:'0x...' }
+
+function encodeProposal(obj) {
+  const json = JSON.stringify(obj);
+  return b64urlEncode(new TextEncoder().encode(json));
+}
+function decodeProposal(str) {
+  const bytes = b64urlDecode(str);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function buildProposalUrl(walletName, proposal) {
+  const base = location.origin + location.pathname;
+  return `${base}#w=${encodeURIComponent(walletName)}&tx=${encodeProposal(proposal)}`;
+}
+function parseHashParams() {
+  const h = location.hash.replace(/^#/, '');
+  if (!h) return null;
+  const params = new URLSearchParams(h);
+  const w = params.get('w');
+  const tx = params.get('tx');
+  if (!w || !tx) return null;
+  try {
+    return { walletName: normalizeName(w), proposal: decodeProposal(tx) };
+  } catch {
+    return { error: 'Malformed proposal URL.' };
+  }
+}
+function clearHash() {
+  history.replaceState(null, '', location.pathname);
+}
+
+// ============================================================
+//  TRANSACTION EXECUTION
+// ============================================================
+
+async function signAndSend(walletName, proposal) {
+  if (!proposal || !proposal.chain || !proposal.to || proposal.value == null) {
+    throw new Error('Proposal is missing required fields.');
+  }
+  if (!ethers.isAddress(proposal.to)) throw new Error('Invalid recipient address.');
+  if (!CHAINS[proposal.chain]) throw new Error('Unsupported chain: ' + proposal.chain);
+
+  const provider = getProvider(proposal.chain);
+  const key = await deriveKeyForWallet(walletName);
+  const wallet = new ethers.Wallet(key, provider);
+
+  if (proposal.from && proposal.from.toLowerCase() !== wallet.address.toLowerCase()) {
+    throw new Error('Wallet name does not match the proposed "from" address.');
+  }
+
+  if (!proposal.token) {
+    return await wallet.sendTransaction({
+      to: proposal.to,
+      value: BigInt(proposal.value),
+      data: proposal.data || '0x'
+    });
+  } else {
+    const tokenAddr = TOKENS[proposal.token]?.addresses?.[proposal.chain]
+      || (ethers.isAddress(proposal.token) ? proposal.token : null);
+    if (!tokenAddr) throw new Error('Unknown token: ' + proposal.token);
+    const contract = new ethers.Contract(tokenAddr, ERC20_ABI, wallet);
+    return await contract.transfer(proposal.to, BigInt(proposal.value));
+  }
+}
+
+// ============================================================
+//  UI PRIMITIVES
+// ============================================================
+
+const app = document.getElementById('app');
+
+function el(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function clear() { app.innerHTML = ''; }
+
+function toast(msg, kind) {
+  const t = el(`<div class="toast ${kind||''}">${escapeHtml(msg)}</div>`);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function showSheet(contentEl) {
+  const overlay = el(`<div class="overlay"><div class="sheet"><div class="sheet-handle"></div></div></div>`);
+  overlay.querySelector('.sheet').appendChild(contentEl);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+  return { close: () => overlay.remove(), el: overlay };
+}
+
+function shortAddr(a) {
+  if (!a) return '';
+  return a.slice(0, 6) + '…' + a.slice(-4);
+}
+function fmtNum(s) {
+  const n = Number(s);
+  if (!isFinite(n)) return s;
+  if (n === 0) return '0';
+  if (n < 0.0001) return '<0.0001';
+  if (n < 1) return n.toPrecision(4);
+  if (n < 1000) return n.toFixed(4).replace(/\.?0+$/, '');
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+async function copy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copied', 'ok');
+  } catch {
+    toast('Copy failed', 'err');
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+}
+
+// ============================================================
+//  SCREENS
+// ============================================================
+
+function render() {
+  const fromUrl = parseHashParams();
+  if (fromUrl && !fromUrl.error) {
+    if (state.credentialId) {
+      renderWalletList();
+      showSignProposal(fromUrl.walletName, fromUrl.proposal);
+    } else {
+      renderWelcome({ pendingProposal: fromUrl });
+    }
+    return;
+  }
+  if (fromUrl?.error) {
+    clearHash();
+    toast(fromUrl.error, 'err');
+  }
+  if (!state.credentialId) renderWelcome();
+  else renderWalletList();
+}
+
+function renderWelcome(opts) {
+  clear();
+  const pending = opts?.pendingProposal;
+  const view = el(`
+    <div class="hero">
+      <div class="tag">Agent-first · Human-signed</div>
+      <h1>Qoin.</h1>
+      <p class="mt-16">A wallet on a single file.<br>Your face is the key.<br>One Face ID, every wallet.</p>
+      <div class="mt-32"></div>
+      <button class="btn primary" id="start">Set up with Face ID</button>
+      <p class="fine mt-16">
+        No accounts. No passwords. No seed phrases.<br>
+        Lose your phone, lose your money. This is a wallet, not a bank.
+      </p>
+      ${pending ? `<p class="fine mt-24" style="color:#7fa7ff">A proposal is waiting. Set up Qoin to review it.</p>` : ''}
+    </div>
+  `);
+  app.appendChild(view);
+  view.querySelector('#start').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
+    try {
+      await registerPasskey();
+      render();
+    } catch (err) {
+      toast(err.message || 'Setup failed', 'err');
+      btn.disabled = false;
+      btn.textContent = 'Set up with Face ID';
+    }
+  };
+}
+
+function renderWalletList() {
+  clear();
+  const view = el(`
+    <div>
+      <div class="topbar">
+        <div class="logo">Qoin</div>
+        <button class="iconbtn" id="add" title="New wallet">+</button>
+      </div>
+      <div id="list"></div>
+      <div class="section-label">About</div>
+      <div class="card">
+        <p class="fine">
+          Each wallet is a standard Ethereum address, derived from your Face ID and the name you chose.
+          Same face plus same name equals the same wallet, always.
+          Works on Ethereum and Base. Agents can only propose &mdash; you are the only signer.
+        </p>
+      </div>
+      <div class="fine center mt-24">
+        ${escapeHtml(location.hostname || 'qoin')} &nbsp;·&nbsp; <span class="link" id="wipe">Wipe device</span>
+      </div>
+    </div>
+  `);
+  app.appendChild(view);
+
+  const list = view.querySelector('#list');
+  if (state.wallets.length === 0) {
+    const empty = el(`
+      <div class="empty">
+        <p>No wallets yet.</p>
+        <button class="btn primary" id="first">Create your first wallet</button>
+      </div>
+    `);
+    list.appendChild(empty);
+    empty.querySelector('#first').onclick = showCreateWallet;
+  } else {
+    const container = el('<div class="col gap-8"></div>');
+    state.wallets.forEach(w => {
+      const row = el(`
+        <div class="wallet-row">
+          <div>
+            <div class="name">${escapeHtml(w.name)}</div>
+            <div class="addr mono">${shortAddr(w.address)}</div>
+          </div>
+          <div class="chev">›</div>
+        </div>
+      `);
+      row.onclick = () => renderWalletDetail(w);
+      container.appendChild(row);
+    });
+    list.appendChild(container);
+  }
+
+  view.querySelector('#add').onclick = showCreateWallet;
+  view.querySelector('#wipe').onclick = () => {
+    const ok = confirm('Wipe Qoin from this device?\n\nThis removes the passkey registration and wallet list from local storage. Your wallets themselves are not deleted — they always exist on Ethereum. You can re-create them on this or any device using the same Apple ID and wallet names.');
+    if (ok) {
+      localStorage.removeItem(STORAGE_KEY);
+      state = loadState();
+      render();
+    }
+  };
+}
+
+async function renderWalletDetail(w) {
+  clear();
+  const view = el(`
+    <div>
+      <div class="topbar">
+        <button class="iconbtn" id="back" title="Back">‹</button>
+        <div class="logo">${escapeHtml(w.name)}</div>
+        <button class="iconbtn" id="menu" title="Options">⋯</button>
+      </div>
+
+      <div class="addr-chip" id="addrchip" title="Tap to copy">
+        <div>${w.address}</div>
+        <div class="copy-hint">Tap to copy address</div>
+      </div>
+
+      <div class="section-label">Balances</div>
+      <div id="balances" class="col gap-8"></div>
+
+      <div class="mt-24 btn-row">
+        <button class="btn" id="recv">Receive</button>
+        <button class="btn primary" id="send">Send</button>
+      </div>
+
+      <div class="section-label">Tools</div>
+      <div class="col gap-8">
+        <button class="btn" id="propose">Create proposal link</button>
+        <a class="btn" href="${CHAINS.base.explorer}/address/${w.address}" target="_blank" rel="noopener">View on Basescan</a>
+        <a class="btn" href="${CHAINS.ethereum.explorer}/address/${w.address}" target="_blank" rel="noopener">View on Etherscan</a>
+      </div>
+    </div>
+  `);
+  app.appendChild(view);
+
+  view.querySelector('#addrchip').onclick = () => copy(w.address);
+  view.querySelector('#back').onclick = renderWalletList;
+  view.querySelector('#send').onclick = () => showSendFlow(w, false);
+  view.querySelector('#propose').onclick = () => showSendFlow(w, true);
+  view.querySelector('#recv').onclick = () => copy(w.address);
+  view.querySelector('#menu').onclick = () => showWalletMenu(w);
+
+  const balBox = view.querySelector('#balances');
+  balBox.innerHTML = `<div class="card"><span class="spinner"></span> <span class="dim" style="margin-left:8px">Loading balances…</span></div>`;
+
+  try {
+    const balances = await fetchBalances(w.address);
+    balBox.innerHTML = '';
+    balances.forEach(b => {
+      if (b.error) {
+        balBox.appendChild(el(`
+          <div class="balance-row">
+            <div class="label"><span class="chain-pill ${b.chain}">${b.chainName}</span></div>
+            <div class="dim" style="font-size:13px">RPC error</div>
+          </div>
+        `));
+        return;
+      }
+      balBox.appendChild(el(`
+        <div class="balance-row">
+          <div class="label">
+            <span class="chain-pill ${b.chain}">${b.chainName}</span>
+            <span style="font-weight:600">${b.symbol}</span>
+          </div>
+          <div class="mono">${fmtNum(b.native)}</div>
+        </div>
+      `));
+      balBox.appendChild(el(`
+        <div class="balance-row">
+          <div class="label">
+            <span class="chain-pill ${b.chain}">${b.chainName}</span>
+            <span style="font-weight:600">USDC</span>
+          </div>
+          <div class="mono">${fmtNum(b.usdc)}</div>
+        </div>
+      `));
+    });
+  } catch (e) {
+    balBox.innerHTML = `<div class="card dim">Failed to load: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function showWalletMenu(w) {
+  const content = el(`
+    <div>
+      <h2>${escapeHtml(w.name)}</h2>
+      <p class="dim mt-8 mono" style="font-size:13px;word-break:break-all;">${w.address}</p>
+      <div class="col gap-8 mt-24">
+        <button class="btn" id="copyaddr">Copy address</button>
+        <button class="btn danger" id="remove">Remove from this device</button>
+      </div>
+      <p class="fine mt-16">
+        Removing a wallet just hides it from this device. The wallet still exists on Ethereum.
+        You can restore it anytime by re-entering the same name.
+      </p>
+    </div>
+  `);
+  const sheet = showSheet(content);
+  content.querySelector('#copyaddr').onclick = () => { copy(w.address); sheet.close(); };
+  content.querySelector('#remove').onclick = () => {
+    const ok = confirm('Remove "' + w.name + '" from this device?\n\nFunds are not affected — the wallet still exists on-chain. You can always restore it by creating a wallet with the same name.');
+    if (!ok) return;
+    state.wallets = state.wallets.filter(x => x.name !== w.name);
+    saveState();
+    sheet.close();
+    renderWalletList();
+  };
+}
+
+function showCreateWallet() {
+  const content = el(`
+    <div>
+      <h2>New wallet</h2>
+      <p class="dim mt-8">One Face ID, many wallets. Pick a name &mdash; something you'll remember, like an agent or a purpose.</p>
+      <div class="field mt-24">
+        <label>Wallet name</label>
+        <input type="text" id="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. atom" maxlength="32">
+        <div class="hint">Lowercase letters, numbers and dashes. Normalized automatically.</div>
+      </div>
+      <button class="btn primary mt-24" id="go">Create with Face ID</button>
+      <p class="fine mt-16">
+        The same name on the same Face ID always gives the same wallet &mdash; forever.
+        You are not really "creating" anything; you are deriving a fresh address from your face plus this name.
+      </p>
+    </div>
+  `);
+  const sheet = showSheet(content);
+  const input = content.querySelector('#name');
+  const btn = content.querySelector('#go');
+  setTimeout(() => input.focus(), 50);
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
+    try {
+      const w = await createWallet(input.value);
+      sheet.close();
+      toast('Wallet "' + w.name + '" created', 'ok');
+      const fresh = findWallet(w.name);
+      if (fresh) renderWalletDetail(fresh); else renderWalletList();
+    } catch (e) {
+      toast(e.message || 'Failed', 'err');
+      btn.disabled = false;
+      btn.textContent = 'Create with Face ID';
+    }
+  };
+}
+
+function showSendFlow(w, asLinkOnly) {
+  const content = el(`
+    <div>
+      <h2>${asLinkOnly ? 'Create proposal link' : 'Send'}</h2>
+      <p class="dim mt-8">From <span class="mono">${escapeHtml(w.name)}</span> · ${shortAddr(w.address)}</p>
+      <div class="col gap-16 mt-24">
+        <div class="field">
+          <label>Chain</label>
+          <select id="chain">
+            <option value="base">Base</option>
+            <option value="ethereum">Ethereum</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Asset</label>
+          <select id="token">
+            <option value="">Native (ETH)</option>
+            <option value="USDC">USDC</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Amount</label>
+          <input type="text" inputmode="decimal" id="amount" placeholder="0.0" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Recipient address</label>
+          <input type="text" class="mono" id="to" placeholder="0x…" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>Memo (optional)</label>
+          <input type="text" id="memo" placeholder="What is this for?" maxlength="120" autocomplete="off">
+        </div>
+      </div>
+      <button class="btn primary mt-24" id="go">${asLinkOnly ? 'Generate link' : 'Sign with Face ID'}</button>
+      ${asLinkOnly ? `<p class="fine mt-16">A proposal link is a self-contained URL an agent could send you. Opening it on a Qoin-enabled device shows this same approval screen.</p>` : ''}
+    </div>
+  `);
+  const sheet = showSheet(content);
+  content.querySelector('#go').onclick = async (ev) => {
+    const chain = content.querySelector('#chain').value;
+    const token = content.querySelector('#token').value || null;
+    const amountRaw = content.querySelector('#amount').value.trim();
+    const to = content.querySelector('#to').value.trim();
+    const memo = content.querySelector('#memo').value.trim() || undefined;
+
+    if (!ethers.isAddress(to)) { toast('Invalid recipient address', 'err'); return; }
+    if (!amountRaw || isNaN(Number(amountRaw)) || Number(amountRaw) <= 0) {
+      toast('Enter a positive amount', 'err'); return;
+    }
+
+    let value;
+    try {
+      const decimals = token ? (TOKENS[token]?.decimals ?? 18) : 18;
+      value = ethers.parseUnits(amountRaw, decimals).toString();
+    } catch {
+      toast('Invalid amount', 'err'); return;
+    }
+    const proposal = {
+      v: 1, chain, to, value,
+      ...(token ? { token } : {}),
+      ...(memo ? { memo } : {}),
+      from: w.address
+    };
+    if (asLinkOnly) {
+      const url = buildProposalUrl(w.name, proposal);
+      sheet.close();
+      showProposalLinkSheet(url);
+    } else {
+      sheet.close();
+      showSignProposal(w.name, proposal);
+    }
+  };
+}
+
+function showProposalLinkSheet(url) {
+  const content = el(`
+    <div>
+      <h2>Proposal link</h2>
+      <p class="dim mt-8">Share this with the signer. Opening it on their phone opens Qoin and asks them to sign.</p>
+      <div class="addr-chip mt-24" id="linkbox" title="Tap to copy"><div>${escapeHtml(url)}</div><div class="copy-hint">Tap to copy</div></div>
+      <div class="col gap-8 mt-24">
+        <button class="btn primary" id="copy">Copy link</button>
+        <button class="btn" id="share">Share…</button>
+      </div>
+    </div>
+  `);
+  const sheet = showSheet(content);
+  content.querySelector('#linkbox').onclick = () => copy(url);
+  content.querySelector('#copy').onclick = () => copy(url);
+  content.querySelector('#share').onclick = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Qoin proposal', url }); } catch {}
+    } else {
+      copy(url);
+    }
+  };
+}
+
+function showSignProposal(walletName, proposal) {
+  const w = findWallet(walletName);
+  const unknownWallet = !w;
+
+  const tokenSym = proposal.token ?
+    (TOKENS[proposal.token] ? proposal.token : shortAddr(proposal.token)) :
+    (CHAINS[proposal.chain]?.symbol || 'ETH');
+  const decimals = proposal.token ? (TOKENS[proposal.token]?.decimals ?? 18) : 18;
+  let amountDisplay = '?';
+  try { amountDisplay = ethers.formatUnits(BigInt(proposal.value), decimals); } catch {}
+
+  const content = el(`
+    <div>
+      <div class="section-label">Agent proposal</div>
+      <div class="proposal-amount">${fmtNum(amountDisplay)}<span class="unit">${escapeHtml(tokenSym)}</span></div>
+      ${proposal.memo ? `<p class="dim">${escapeHtml(proposal.memo)}</p>` : ''}
+      <div class="mt-24">
+        <div class="proposal-row">
+          <div class="k">Wallet</div>
+          <div class="v">${escapeHtml(walletName)}${unknownWallet ? ' <span class="dim">(not on this device)</span>' : ''}</div>
+        </div>
+        <div class="proposal-row">
+          <div class="k">Chain</div>
+          <div class="v">${CHAINS[proposal.chain]?.name || proposal.chain}</div>
+        </div>
+        <div class="proposal-row">
+          <div class="k">To</div>
+          <div class="v mono">${shortAddr(proposal.to)}</div>
+        </div>
+        ${proposal.from ? `
+        <div class="proposal-row">
+          <div class="k">From</div>
+          <div class="v mono">${shortAddr(proposal.from)}</div>
+        </div>` : ''}
+      </div>
+      ${unknownWallet ? `
+        <p class="fine mt-16">
+          This proposal targets a wallet named <span class="mono">${escapeHtml(walletName)}</span> that is not on this device.
+          Signing will derive it from your Face ID. The derived address must match the proposal's "from" field or signing will be refused.
+        </p>
+      ` : ''}
+      <div class="col gap-8 mt-24">
+        <button class="btn primary" id="sign">Sign with Face ID</button>
+        <button class="btn" id="reject">Reject</button>
+      </div>
+      <p class="fine mt-16">Gas is paid from this wallet's native ${CHAINS[proposal.chain]?.symbol || 'ETH'} balance on ${CHAINS[proposal.chain]?.name || proposal.chain}.</p>
+    </div>
+  `);
+  const sheet = showSheet(content);
+
+  content.querySelector('#reject').onclick = () => { clearHash(); sheet.close(); render(); };
+  content.querySelector('#sign').onclick = async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
+    try {
+      const tx = await signAndSend(walletName, proposal);
+      clearHash();
+      sheet.close();
+
+      // If this wallet was derived ad-hoc, remember it locally for next time
+      if (unknownWallet && proposal.from && !findWallet(walletName)) {
+        state.wallets.push({ name: walletName, address: proposal.from, createdAt: Date.now() });
+        saveState();
+      }
+
+      const explorer = CHAINS[proposal.chain].explorer + '/tx/' + tx.hash;
+      showReceipt(tx.hash, explorer);
+    } catch (e) {
+      toast(e.message || 'Signing failed', 'err');
+      btn.disabled = false;
+      btn.textContent = 'Sign with Face ID';
+    }
+  };
+}
+
+function showReceipt(hash, explorerUrl) {
+  const content = el(`
+    <div class="center">
+      <div class="section-label">Broadcast</div>
+      <h2>Transaction sent</h2>
+      <p class="dim mt-8">It'll confirm in a few seconds.</p>
+      <div class="addr-chip mono mt-24" id="hashbox">${hash}<div class="copy-hint">Tap to copy hash</div></div>
+      <div class="col gap-8 mt-24">
+        <a class="btn primary" href="${explorerUrl}" target="_blank" rel="noopener">Open in explorer</a>
+        <button class="btn" id="done">Done</button>
+      </div>
+    </div>
+  `);
+  const sheet = showSheet(content);
+  content.querySelector('#hashbox').onclick = () => copy(hash);
+  content.querySelector('#done').onclick = () => { sheet.close(); render(); };
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+
+window.addEventListener('hashchange', render);
+
+if (!webauthnAvailable()) {
+  app.appendChild(el(`
+    <div class="hero">
+      <h1>Qoin.</h1>
+      <p class="mt-16">This browser does not support passkeys.<br>Open Qoin on iOS 18+ Safari, or a recent Chrome/Edge on a device with a platform authenticator (Face ID, Touch ID, Windows Hello).</p>
+    </div>
+  `));
+} else if (typeof window.ethers === 'undefined') {
+  app.appendChild(el(`
+    <div class="hero">
+      <h1>Qoin.</h1>
+      <p class="mt-16">Could not load the Ethereum library. Check your connection and reload.</p>
+    </div>
+  `));
+} else {
+  render();
+}
+
+})();
+</script>
+</body>
+</html>
