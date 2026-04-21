@@ -182,7 +182,9 @@ The HTML file itself is freely replicable, but passkeys are bound to origin. A w
 
 - **Chains:** Ethereum mainnet, Base
 - **Native assets:** ETH
-- **Tokens:** USDC on both chains (more on request)
+- **Tokens:**
+  - **USDC** — native issuance on both Ethereum and Base
+  - **USDT** — official Tether contract on Ethereum; **bridged** on Base (not issued or redeemable by Tether itself — Tether has not deployed USDT natively on Base)
 - **Arbitrary ERC-20:** by contract address
 
 ---

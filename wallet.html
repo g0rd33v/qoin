@@ -289,11 +289,22 @@ const TOKENS = {
       ethereum: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
       base:     '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'
     }
+  },
+  USDT: {
+    decimals: 6,
+    addresses: {
+      // Ethereum: Tether's original contract. Transfer returns nothing (non-standard).
+      ethereum: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+      // Base: BRIDGED USDT. Not issued or redeemable by Tether.
+      base:     '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2'
+    }
   }
 };
 
+// Note: "transfer" has no return value declared so this ABI is compatible
+// with both standard ERC-20 (returns bool) and USDT on Ethereum (returns nothing).
 const ERC20_ABI = [
-  'function transfer(address to, uint256 amount) returns (bool)',
+  'function transfer(address to, uint256 amount)',
   'function balanceOf(address owner) view returns (uint256)',
   'function decimals() view returns (uint8)'
 ];
@@ -470,19 +481,25 @@ async function fetchBalances(address) {
   for (const ck of Object.keys(CHAINS)) {
     const provider = getProvider(ck);
     try {
-      const [nativeBal, usdcBal] = await Promise.all([
-        provider.getBalance(address).catch(() => 0n),
-        (async () => {
-          const tok = TOKENS.USDC.addresses[ck];
-          const c = new ethers.Contract(tok, ERC20_ABI, provider);
-          try { return await c.balanceOf(address); } catch { return 0n; }
-        })()
-      ]);
+      const nativeBal = await provider.getBalance(address).catch(() => 0n);
+      const tokens = {};
+      for (const [sym, tok] of Object.entries(TOKENS)) {
+        const addr = tok.addresses[ck];
+        if (!addr) continue;
+        try {
+          const c = new ethers.Contract(addr, ERC20_ABI, provider);
+          tokens[sym] = await c.balanceOf(address);
+        } catch { tokens[sym] = 0n; }
+      }
       out.push({
         chain: ck, chainName: CHAINS[ck].name,
         symbol: CHAINS[ck].symbol,
         native: ethers.formatUnits(nativeBal, 18),
-        usdc: ethers.formatUnits(usdcBal, TOKENS.USDC.decimals)
+        tokens: Object.fromEntries(
+          Object.entries(tokens).map(([sym, bal]) =>
+            [sym, ethers.formatUnits(bal, TOKENS[sym].decimals)]
+          )
+        )
       });
     } catch (e) {
       out.push({ chain: ck, chainName: CHAINS[ck].name, symbol: CHAINS[ck].symbol, error: e.message });
@@ -804,15 +821,17 @@ async function renderWalletDetail(w) {
           <div class="mono">${fmtNum(b.native)}</div>
         </div>
       `));
-      balBox.appendChild(el(`
-        <div class="balance-row">
-          <div class="label">
-            <span class="chain-pill ${b.chain}">${b.chainName}</span>
-            <span style="font-weight:600">USDC</span>
+      for (const [sym, amount] of Object.entries(b.tokens || {})) {
+        balBox.appendChild(el(`
+          <div class="balance-row">
+            <div class="label">
+              <span class="chain-pill ${b.chain}">${b.chainName}</span>
+              <span style="font-weight:600">${sym}</span>
+            </div>
+            <div class="mono">${fmtNum(amount)}</div>
           </div>
-          <div class="mono">${fmtNum(b.usdc)}</div>
-        </div>
-      `));
+        `));
+      }
     });
   } catch (e) {
     balBox.innerHTML = `<div class="card dim">Failed to load: ${escapeHtml(e.message)}</div>`;
@@ -902,6 +921,7 @@ function showSendFlow(w, asLinkOnly) {
           <select id="token">
             <option value="">Native (ETH)</option>
             <option value="USDC">USDC</option>
+            <option value="USDT">USDT</option>
           </select>
         </div>
         <div class="field">
