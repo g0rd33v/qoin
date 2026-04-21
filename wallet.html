@@ -309,12 +309,25 @@ const ERC20_ABI = [
   'function decimals() view returns (uint8)'
 ];
 
-const STORAGE_KEY = 'qoin.v1';
+const STORAGE_KEY  = 'qoin.v1';        // public meta: credentialId, userId
+const VAULT_KEY    = 'qoin.vault';     // ciphertext: wallet list (names + addresses)
 const PRF_SALT_PREFIX = 'qoin-eth-v1:';
+const VAULT_PRF_SALT  = 'qoin-vault-v1';
 
 // ============================================================
 //  STATE
 // ============================================================
+//
+// Two layers:
+//   - meta   : public. Stores credentialId so we can prompt the right passkey.
+//              Never contains wallet names or addresses.
+//   - vault  : encrypted. AES-GCM-256 over JSON {wallets:[{name,address,createdAt}, ...]}.
+//              Key derived from passkey PRF on the fixed VAULT_PRF_SALT.
+//   - state.wallets : in-memory plaintext, populated only when unlocked.
+//
+// "Locked" = vault ciphertext exists but plaintext wallets are not in memory.
+// "Unlocked" = state.wallets is populated.
+// "Fresh" = no credentialId in meta; first-time setup needed.
 
 let state = loadState();
 
@@ -324,15 +337,33 @@ function loadState() {
     return {
       userId: s?.userId || null,
       credentialId: s?.credentialId || null,
-      wallets: Array.isArray(s?.wallets) ? s.wallets : []
+      wallets: [],          // always empty on load — populated by unlock
+      unlocked: false       // true once vault has been decrypted this session
     };
   } catch {
-    return { userId: null, credentialId: null, wallets: [] };
+    return { userId: null, credentialId: null, wallets: [], unlocked: false };
   }
 }
 
-function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function saveMeta() {
+  // Save only public metadata. Never write wallets here.
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    userId: state.userId,
+    credentialId: state.credentialId
+  }));
+}
+
+function vaultExists() {
+  return !!localStorage.getItem(VAULT_KEY);
+}
+function clearVaultAndMeta() {
+  localStorage.removeItem(VAULT_KEY);
+  localStorage.removeItem(STORAGE_KEY);
+}
+function clearVaultPlaintext() {
+  // Keep meta + vault ciphertext. Drop in-memory wallets.
+  state.wallets = [];
+  state.unlocked = false;
 }
 
 // ============================================================
@@ -356,8 +387,103 @@ function hex(bytes) {
 }
 
 // ============================================================
-//  WEBAUTHN + KEY DERIVATION
+//  VAULT ENCRYPTION
 // ============================================================
+// AES-GCM-256 with a 12-byte random IV per save.
+// Key is derived from passkey PRF over a fixed salt, so it never persists.
+//
+// Storage format (under VAULT_KEY): JSON { v:1, iv:b64url, ct:b64url }
+// Plaintext shape: JSON { wallets: [{name, address, createdAt}, ...] }
+
+let _vaultKey = null;  // CryptoKey, lives only in memory while unlocked
+
+async function deriveVaultKey() {
+  // Asks for one Face ID; returns a non-extractable AES-GCM CryptoKey.
+  if (!state.credentialId) throw new Error('No passkey registered.');
+  const credId = b64urlDecode(state.credentialId);
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const salt = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(VAULT_PRF_SALT))
+  );
+
+  const assertion = await navigator.credentials.get({
+    publicKey: {
+      challenge,
+      rpId: location.hostname,
+      userVerification: 'required',
+      timeout: 60000,
+      allowCredentials: [{ type: 'public-key', id: credId, transports: ['internal','hybrid'] }],
+      extensions: { prf: { eval: { first: salt } } }
+    }
+  });
+  if (!assertion) throw new Error('Face ID cancelled.');
+
+  const prf = assertion.getClientExtensionResults?.()?.prf?.results?.first;
+  if (!prf) throw new Error('PRF not available — cannot decrypt vault.');
+  const raw = new Uint8Array(prf);
+  if (raw.length !== 32) throw new Error('Bad PRF output length.');
+
+  return await crypto.subtle.importKey(
+    'raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptVault(plaintextObj, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new TextEncoder().encode(JSON.stringify(plaintextObj));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+  return {
+    v: 1,
+    iv: b64urlEncode(iv),
+    ct: b64urlEncode(new Uint8Array(ct))
+  };
+}
+
+async function decryptVault(blob, key) {
+  if (!blob || blob.v !== 1) throw new Error('Unsupported vault format.');
+  const iv = b64urlDecode(blob.iv);
+  const ct = b64urlDecode(blob.ct);
+  let plain;
+  try {
+    plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  } catch {
+    throw new Error('Could not decrypt vault. Wrong Face ID, or vault was created with a different passkey.');
+  }
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+async function persistWallets() {
+  // Encrypts current state.wallets into the vault. Requires _vaultKey to be loaded.
+  if (!_vaultKey) throw new Error('Vault is locked.');
+  const blob = await encryptVault({ wallets: state.wallets }, _vaultKey);
+  localStorage.setItem(VAULT_KEY, JSON.stringify(blob));
+}
+
+async function unlockVault() {
+  // One Face ID prompt: derive key, decrypt vault into memory.
+  _vaultKey = await deriveVaultKey();
+  const stored = localStorage.getItem(VAULT_KEY);
+  if (stored) {
+    try {
+      const blob = JSON.parse(stored);
+      const plain = await decryptVault(blob, _vaultKey);
+      state.wallets = Array.isArray(plain.wallets) ? plain.wallets : [];
+    } catch (e) {
+      _vaultKey = null;
+      throw e;
+    }
+  } else {
+    state.wallets = [];   // brand new vault
+  }
+  state.unlocked = true;
+}
+
+function lockVault() {
+  _vaultKey = null;
+  clearVaultPlaintext();
+}
+
+
 
 function webauthnAvailable() {
   return typeof window.PublicKeyCredential !== 'undefined' &&
@@ -402,8 +528,7 @@ async function restorePasskey() {
 
   state.credentialId = b64urlEncode(new Uint8Array(assertion.rawId));
   if (!state.userId) state.userId = b64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
-  state.wallets = state.wallets || [];
-  saveState();
+  saveMeta();
   return true;
 }
 
@@ -438,7 +563,7 @@ async function registerPasskey() {
 
   state.userId = b64urlEncode(userId);
   state.credentialId = b64urlEncode(new Uint8Array(credential.rawId));
-  saveState();
+  saveMeta();
   return true;
 }
 
@@ -498,6 +623,7 @@ function findWallet(name) {
 }
 
 async function createWallet(rawName) {
+  if (!state.unlocked) throw new Error('Vault is locked. Unlock with Face ID first.');
   const name = normalizeName(rawName);
   if (!name || name.length < 1 || name.length > 32) {
     throw new Error('Name must be 1–32 letters, digits or dashes.');
@@ -509,7 +635,7 @@ async function createWallet(rawName) {
   const address = wallet.address;
 
   state.wallets.push({ name, address, createdAt: Date.now() });
-  saveState();
+  await persistWallets();
   return { name, address };
 }
 
@@ -686,21 +812,82 @@ function escapeHtml(s) {
 
 function render() {
   const fromUrl = parseHashParams();
-  if (fromUrl && !fromUrl.error) {
-    if (state.credentialId) {
-      renderWalletList();
-      showSignProposal(fromUrl.walletName, fromUrl.proposal);
-    } else {
-      renderWelcome({ pendingProposal: fromUrl });
-    }
-    return;
-  }
+
+  // State machine:
+  //   1. No credentialId          → fresh device, show Set Up
+  //   2. credentialId + locked    → show Unlock screen
+  //   3. credentialId + unlocked  → wallet list (and pending proposal if any)
+  //
+  // Pending proposals: when locked, show Unlock + a hint that a proposal is waiting.
+  // After unlock the same render() pass picks it up.
+
   if (fromUrl?.error) {
     clearHash();
     toast(fromUrl.error, 'err');
   }
-  if (!state.credentialId) renderWelcome();
-  else renderWalletList();
+  const pendingProposal = (fromUrl && !fromUrl.error) ? fromUrl : null;
+
+  if (!state.credentialId) {
+    renderWelcome({ pendingProposal });
+    return;
+  }
+  if (!state.unlocked) {
+    renderLocked({ pendingProposal });
+    return;
+  }
+  // Unlocked.
+  renderWalletList();
+  if (pendingProposal) {
+    showSignProposal(pendingProposal.walletName, pendingProposal.proposal);
+  }
+}
+
+function renderLocked(opts) {
+  clear();
+  const pending = opts?.pendingProposal;
+  const hasVault = vaultExists();
+  const view = el(`
+    <div class="hero">
+      <div class="tag">Locked</div>
+      <h1>Qoin.</h1>
+      <p class="mt-16">Face ID to see your wallets.</p>
+      <div class="mt-32"></div>
+      <button class="btn primary" id="unlock">Unlock with Face ID</button>
+      <p class="fine mt-16" style="text-align:left;max-width:340px;margin-left:auto;margin-right:auto;">
+        ${hasVault
+          ? 'Your wallet names and addresses are encrypted on this device. Only your face can decrypt them.'
+          : 'No saved wallets yet. Unlocking opens a fresh vault you can add wallets to.'}
+      </p>
+      ${pending ? `<p class="fine mt-16" style="color:#7fa7ff">A proposal is waiting. Unlock to review it.</p>` : ''}
+      <div class="fine center mt-32">
+        Not your device? <span class="link" id="forget">Forget this device</span>
+      </div>
+    </div>
+  `);
+  app.appendChild(view);
+
+  view.querySelector('#unlock').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
+    try {
+      await unlockVault();
+      render();
+    } catch (err) {
+      toast(err.message || 'Unlock failed', 'err');
+      btn.disabled = false;
+      btn.textContent = 'Unlock with Face ID';
+    }
+  };
+
+  view.querySelector('#forget').onclick = () => {
+    const ok = confirm('Forget Qoin on this device?\n\nThis removes the passkey reference and the encrypted vault from this browser. Your wallets still exist on Ethereum, and your passkey still lives in iCloud Keychain — you can re-pair from a fresh "Set up" or "Restore" later. Use this if you are about to hand off this device.');
+    if (ok) {
+      clearVaultAndMeta();
+      state = loadState();
+      render();
+    }
+  };
 }
 
 function renderWelcome(opts) {
@@ -729,6 +916,9 @@ function renderWelcome(opts) {
     btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
     try {
       await registerPasskey();
+      // Immediately unlock so the user lands on the wallet list, not the lock screen.
+      // This requires a second Face ID prompt for the PRF key.
+      try { await unlockVault(); } catch {}
       render();
     } catch (err) {
       toast(err.message || 'Setup failed', 'err');
@@ -743,7 +933,8 @@ function renderWelcome(opts) {
     btn.innerHTML = '<span class="spinner"></span> Waiting for Face ID…';
     try {
       await restorePasskey();
-      toast('Restored. Re-enter your wallet names.', 'ok');
+      // Restore writes credentialId. Unlock now decrypts (or initializes) the vault.
+      try { await unlockVault(); } catch {}
       render();
     } catch (err) {
       toast(err.message || 'Restore failed', 'err');
@@ -811,12 +1002,8 @@ function renderWalletList() {
 
   view.querySelector('#add').onclick = showCreateWallet;
   view.querySelector('#lock').onclick = () => {
-    const ok = confirm('Lock Qoin on this device?\n\nYour wallets are hidden but still exist on Ethereum. Anyone opening this page sees a fresh welcome screen — they will not know you have a wallet here. Unlock anytime with Face ID by tapping "Restore."\n\nYou will need to re-enter your wallet names when you return.');
-    if (ok) {
-      localStorage.removeItem(STORAGE_KEY);
-      state = loadState();
-      render();
-    }
+    lockVault();
+    render();
   };
 }
 
@@ -919,11 +1106,12 @@ function showWalletMenu(w) {
   `);
   const sheet = showSheet(content);
   content.querySelector('#copyaddr').onclick = () => { copy(w.address); sheet.close(); };
-  content.querySelector('#remove').onclick = () => {
+  content.querySelector('#remove').onclick = async () => {
     const ok = confirm('Remove "' + w.name + '" from this device?\n\nFunds are not affected — the wallet still exists on-chain. You can always restore it by creating a wallet with the same name.');
     if (!ok) return;
     state.wallets = state.wallets.filter(x => x.name !== w.name);
-    saveState();
+    try { await persistWallets(); }
+    catch (e) { toast(e.message || 'Save failed', 'err'); return; }
     sheet.close();
     renderWalletList();
   };
@@ -1126,10 +1314,10 @@ function showSignProposal(walletName, proposal) {
       clearHash();
       sheet.close();
 
-      // If this wallet was derived ad-hoc, remember it locally for next time
-      if (unknownWallet && proposal.from && !findWallet(walletName)) {
+      // If this wallet was derived ad-hoc and we're unlocked, remember it locally for next time
+      if (unknownWallet && proposal.from && state.unlocked && !findWallet(walletName)) {
         state.wallets.push({ name: walletName, address: proposal.from, createdAt: Date.now() });
-        saveState();
+        try { await persistWallets(); } catch {}
       }
 
       const explorer = CHAINS[proposal.chain].explorer + '/tx/' + tx.hash;
