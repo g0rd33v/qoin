@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>Qoin — The crypto wallet of the future. Agent-first, human-signed.</title>
+<meta name="description" content="A single-file Ethereum wallet bound to Face ID. Agents propose transactions; you sign with your face. No accounts, no passwords, no seed phrases, no backend.">
+<meta property="og:title" content="Qoin — Agent-first, human-signed.">
+<meta property="og:description" content="A single-file Ethereum wallet. Your face is the key. Agents propose, you sign.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://rsms.me">
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+<style>
+:root{
+  --bg:#000;
+  --card:#0e0e0e;
+  --card-hi:#161616;
+  --border:rgba(255,255,255,.07);
+  --border-hi:rgba(255,255,255,.14);
+  --text:#fff;
+  --dim:rgba(255,255,255,.55);
+  --faint:rgba(255,255,255,.3);
+  --accent:#2563eb;
+  --accent-hi:#1d4ed8;
+  --r:14px;
+  --r-sm:10px;
+  --font:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+@supports(font-variation-settings:normal){:root{--font:'Inter var','Inter',-apple-system,system-ui,sans-serif;}}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  font-feature-settings:'cv11','ss01';
+  -webkit-font-smoothing:antialiased;
+  font-size:16px;
+  line-height:1.55;
+}
+body{
+  padding:0;
+  overflow-x:hidden;
+}
+a{color:var(--text);text-decoration:none;}
+a:hover{opacity:.75;}
+h1,h2,h3,h4{font-weight:800;letter-spacing:-.03em;line-height:1.05;}
+h1{font-size:clamp(56px,11vw,160px);letter-spacing:-.05em;line-height:.95;}
+h2{font-size:clamp(32px,4.5vw,56px);letter-spacing:-.04em;line-height:1.05;}
+h3{font-size:clamp(20px,2.2vw,26px);letter-spacing:-.025em;font-weight:700;}
+h4{font-size:16px;letter-spacing:-.01em;font-weight:700;}
+p{color:var(--dim);}
+p.lead{color:var(--text);font-size:clamp(18px,2vw,22px);line-height:1.45;letter-spacing:-.01em;}
+.mono{font-family:var(--mono);}
+.dim{color:var(--dim);}
+.faint{color:var(--faint);}
+
+/* Layout */
+.wrap{max-width:960px;margin:0 auto;padding:0 24px;}
+.wrap-narrow{max-width:720px;margin:0 auto;padding:0 24px;}
+
+/* Nav */
+.nav{
+  position:sticky;top:0;z-index:10;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.nav-inner{
+  max-width:960px;margin:0 auto;padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{font-size:20px;font-weight:800;letter-spacing:-.04em;}
+.logo::after{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);margin-left:3px;margin-bottom:3px;vertical-align:middle;}
+.nav-links{display:flex;align-items:center;gap:24px;font-size:14px;color:var(--dim);}
+.nav-links a{color:var(--dim);}
+.nav-links a:hover{color:var(--text);opacity:1;}
+@media (max-width:560px){.nav-links a.hide-sm{display:none;}}
+
+/* Hero */
+.hero{
+  padding:120px 24px 100px;
+  text-align:center;
+  border-bottom:1px solid var(--border);
+}
+.tag{
+  display:inline-block;font-size:11px;padding:6px 12px;border-radius:999px;
+  background:rgba(37,99,235,.08);color:#7fa7ff;border:1px solid rgba(37,99,235,.2);
+  letter-spacing:.12em;text-transform:uppercase;font-weight:600;
+  margin-bottom:32px;
+}
+.hero h1{margin-bottom:32px;}
+.hero .subhead{
+  font-size:clamp(18px,2.2vw,26px);
+  color:var(--dim);max-width:640px;margin:0 auto 48px;
+  letter-spacing:-.01em;line-height:1.4;
+}
+.hero .subhead strong{color:var(--text);font-weight:600;}
+
+.cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:16px 28px;
+  border-radius:var(--r);
+  font-weight:600;font-size:15px;letter-spacing:-.005em;
+  border:1px solid var(--border);
+  background:var(--card);
+  transition:background .15s,border-color .15s,color .15s,transform .08s;
+  font-family:inherit;
+  cursor:pointer;
+}
+.btn:hover{background:var(--card-hi);border-color:var(--border-hi);opacity:1;}
+.btn:active{transform:scale(.99);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn.primary:hover{background:var(--accent-hi);border-color:var(--accent-hi);}
+.btn .arrow{font-size:18px;margin-left:2px;transition:transform .15s;}
+.btn:hover .arrow{transform:translateX(2px);}
+
+/* Sections */
+section{
+  padding:96px 0;
+  border-bottom:1px solid var(--border);
+}
+@media (max-width:640px){section{padding:64px 0;}}
+.section-label{
+  font-size:11px;color:var(--faint);
+  text-transform:uppercase;letter-spacing:.14em;font-weight:600;
+  margin-bottom:20px;
+}
+section h2{margin-bottom:24px;}
+section p + p{margin-top:18px;}
+
+/* Two-col */
+.two{display:grid;grid-template-columns:1fr;gap:48px;}
+@media (min-width:900px){.two{grid-template-columns:280px 1fr;gap:64px;}}
+
+/* Code block */
+.code{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:24px;font-family:var(--mono);font-size:13px;
+  color:var(--dim);line-height:1.7;
+  overflow-x:auto;
+}
+.code .k{color:#7fa7ff;}
+.code .s{color:#e5b1ff;}
+.code .c{color:var(--faint);font-style:italic;}
+.code .v{color:var(--text);}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:1fr;gap:12px;}
+@media (min-width:640px){.cards.two-up{grid-template-columns:1fr 1fr;}}
+@media (min-width:880px){.cards.three-up{grid-template-columns:1fr 1fr 1fr;}}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:24px;
+}
+.card h3{margin-bottom:8px;}
+.card h4{margin-bottom:6px;}
+.card p{color:var(--dim);font-size:15px;}
+
+/* Spec table */
+.spec{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;
+}
+.spec .row{
+  display:flex;flex-direction:column;gap:4px;
+  padding:18px 24px;
+  border-bottom:1px solid var(--border);
+}
+.spec .row:last-child{border-bottom:none;}
+@media (min-width:640px){
+  .spec .row{flex-direction:row;align-items:flex-start;gap:32px;}
+  .spec .row .k{width:200px;flex-shrink:0;}
+}
+.spec .k{color:var(--dim);font-size:14px;font-weight:500;}
+.spec .v{color:var(--text);font-size:15px;}
+.spec .v .mono{font-size:13px;color:var(--dim);}
+
+/* Feature comparison */
+.pros-cons{display:grid;grid-template-columns:1fr;gap:12px;}
+@media (min-width:720px){.pros-cons{grid-template-columns:1fr 1fr;}}
+.pros-cons .card h4{color:var(--text);}
+.pros-cons ul{list-style:none;padding:0;margin:12px 0 0;}
+.pros-cons li{
+  position:relative;padding:8px 0 8px 20px;
+  color:var(--dim);font-size:14px;line-height:1.5;
+  border-bottom:1px solid var(--border);
+}
+.pros-cons li:last-child{border-bottom:none;}
+.pros-cons li::before{
+  content:'';position:absolute;left:0;top:14px;
+  width:4px;height:4px;border-radius:50%;background:var(--faint);
+}
+.pros-cons .protect li::before{background:#5bc984;}
+.pros-cons .noprotect li::before{background:#ff7a7a;}
+
+/* Callout */
+.callout{
+  background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.25);
+  border-radius:var(--r);padding:24px 28px;
+  color:var(--text);
+}
+.callout .section-label{color:#7fa7ff;margin-bottom:12px;}
+
+/* Footer */
+footer{
+  padding:56px 24px;
+  text-align:center;
+}
+footer .mono{color:var(--faint);font-size:12px;letter-spacing:.04em;}
+footer .links{display:flex;justify-content:center;gap:24px;margin-bottom:20px;font-size:14px;color:var(--dim);flex-wrap:wrap;}
+
+/* Version pill inline */
+.vpill{
+  display:inline-block;
+  font-size:11px;padding:3px 8px;border-radius:999px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  color:var(--dim);letter-spacing:.08em;text-transform:uppercase;font-weight:600;
+  vertical-align:middle;margin-left:8px;
+}
+
+/* Big quote */
+.pull{
+  font-size:clamp(22px,3vw,32px);
+  font-weight:700;letter-spacing:-.025em;line-height:1.3;
+  color:var(--text);max-width:800px;margin:32px 0;
+}
+.pull .accent{color:var(--accent);}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:0;height:0;}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">Qoin</a>
+    <div class="nav-links">
+      <a href="#how" class="hide-sm">How it works</a>
+      <a href="#agents" class="hide-sm">For agents</a>
+      <a href="#security" class="hide-sm">Security</a>
+      <a href="https://github.com/g0rd33v/qoin" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="tag">v0.1 · Alpha</div>
+  <h1>Qoin.</h1>
+  <p class="subhead">The crypto wallet of the future. <strong>Agent-first, human-signed.</strong> A single-file Ethereum wallet. Your face is the key. Agents propose, you sign.</p>
+  <div class="cta-row">
+    <a href="./wallet.html" class="btn primary">Open wallet <span class="arrow">→</span></a>
+    <a href="https://github.com/g0rd33v/qoin" target="_blank" rel="noopener" class="btn">Source on GitHub</a>
+  </div>
+</header>
+
+<section id="idea">
+  <div class="wrap-narrow">
+    <div class="section-label">The idea</div>
+    <h2>Agents need money. Humans need oversight.</h2>
+    <p class="lead" style="margin-top:28px;">Every AI agent that touches money today faces the same dead end. Either it holds custody of your funds — and you have to trust it absolutely — or it cannot spend at all. Neither is good enough for a world where agents run on your behalf around the clock.</p>
+    <p class="lead" style="margin-top:20px;">Qoin is the third path. The agent holds nothing. It knows your address, it knows what the wallet can afford, and when it needs to pay for something, it builds a transaction and sends you a link. You tap, Face ID confirms, the money moves. The agent never touches keys. You never type a password.</p>
+
+    <div class="pull">The agent proposes.<br>The human signs.<br><span class="accent">The wallet is one HTML file.</span></div>
+
+    <p>The wallet itself is a single HTML file. No backend, no database, no subscription. Host it on GitHub Pages, your own domain, a USB stick, or any static host. Read the source. Mirror it. Fork it. The file is interchangeable; your wallets are not.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="two">
+      <div>
+        <div class="section-label">How it works</div>
+        <h2>Face ID is the key.</h2>
+      </div>
+      <div>
+        <p class="lead">Your iPhone's Secure Enclave stores a passkey — a cryptographic key that only Face ID can unlock. Modern browsers expose a feature called <strong style="color:var(--text)">WebAuthn PRF</strong> that lets you ask the passkey to compute <span class="mono" style="color:var(--text)">HMAC-SHA256</span> over any 32-byte input. The output is deterministic: same face, same input, same 32 bytes — always.</p>
+
+        <p>Qoin uses those 32 bytes as an Ethereum private key. For each wallet you create, Qoin derives a unique input from the wallet's name. Same face plus same name equals the same wallet, forever. The private key exists in JavaScript memory only during the signing moment, and is zeroed after.</p>
+
+        <div class="code" style="margin-top:24px;">
+<span class="c">// For each wallet you create:</span>
+<span class="v">salt</span>       = <span class="k">SHA-256</span>(<span class="s">"qoin-eth-v1:"</span> + walletName)
+<span class="v">privateKey</span> = <span class="k">passkey-PRF</span>(salt)   <span class="c">// requires Face ID</span>
+<span class="v">publicKey</span>  = <span class="k">secp256k1</span>(privateKey)
+<span class="v">address</span>    = <span class="k">keccak256</span>(publicKey)<span class="c"> // last 20 bytes</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="multiwallet">
+  <div class="wrap">
+    <div class="two">
+      <div>
+        <div class="section-label">Multi-wallet</div>
+        <h2>One face, many wallets.</h2>
+      </div>
+      <div>
+        <p class="lead">Different wallet names produce different keys, which produce different addresses. One Face ID, unlimited wallets.</p>
+        <p>Name them anything you'll remember: <span class="mono" style="color:var(--text)">atom</span>, <span class="mono" style="color:var(--text)">tako</span>, <span class="mono" style="color:var(--text)">main</span>, <span class="mono" style="color:var(--text)">savings</span>, <span class="mono" style="color:var(--text)">pocket</span>. Each is a silo — fund it independently, assign it to one agent, and a compromised agent loses its own envelope, not the house.</p>
+        <div class="code" style="margin-top:24px;">
+<span class="v">atom</span> → <span class="k">HMAC-SHA256</span>(passkey, <span class="s">"qoin-eth-v1:atom"</span>) → <span class="c">0xA1B2…</span>
+<span class="v">tako</span> → <span class="k">HMAC-SHA256</span>(passkey, <span class="s">"qoin-eth-v1:tako"</span>) → <span class="c">0xC3D4…</span>
+<span class="v">main</span> → <span class="k">HMAC-SHA256</span>(passkey, <span class="s">"qoin-eth-v1:main"</span>) → <span class="c">0xE5F6…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="humans">
+  <div class="wrap">
+    <div class="section-label">For humans</div>
+    <h2 style="margin-bottom:48px;">A wallet, the way it should feel.</h2>
+    <div class="cards three-up">
+      <div class="card">
+        <h4>No setup</h4>
+        <p>First launch, one Face ID prompt, a passkey lives in Secure Enclave. No email, no sign-up, no recovery questions.</p>
+      </div>
+      <div class="card">
+        <h4>Name and go</h4>
+        <p>Type a name, Face ID, an Ethereum address appears. Copy it, fund it from an exchange. Same name always returns the same wallet.</p>
+      </div>
+      <div class="card">
+        <h4>Receive normally</h4>
+        <p>Every wallet shows its address on its detail page. Incoming transactions arrive without any action from you.</p>
+      </div>
+      <div class="card">
+        <h4>Send in one tap</h4>
+        <p>Pick chain, pick asset, enter amount and recipient. Face ID. Broadcast. The wallet handles gas, nonce, and signing automatically.</p>
+      </div>
+      <div class="card">
+        <h4>Any device</h4>
+        <p>Open Qoin on any iPhone signed into your Apple ID. Your iCloud Keychain syncs the passkey. Re-enter wallet names. Addresses return.</p>
+      </div>
+      <div class="card">
+        <h4>Leave when you want</h4>
+        <p>Wipe device clears local storage. The on-chain wallets are always recoverable from the same face plus the same names.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="wrap">
+    <div class="two">
+      <div>
+        <div class="section-label">For agents</div>
+        <h2>The protocol is the URL.</h2>
+      </div>
+      <div>
+        <p class="lead">An agent has no account, no API key, no session, no login. It builds a transaction as JSON and sends you a link. That is the entire protocol.</p>
+        <p>Opening the link on any Qoin-enabled device pops the approval screen. You see the amount, the recipient, the chain, the memo, the expected sender. Face ID signs it. The network confirms it. The agent goes back to whatever it was doing.</p>
+      </div>
+    </div>
+
+    <div class="cards two-up" style="margin-top:56px;">
+      <div class="card">
+        <h4>Proposal JSON</h4>
+        <div class="code" style="margin-top:12px;padding:18px;">
+{
+  <span class="k">"v"</span>: <span class="v">1</span>,
+  <span class="k">"chain"</span>: <span class="s">"base"</span>,
+  <span class="k">"to"</span>: <span class="s">"0xRecipient…"</span>,
+  <span class="k">"value"</span>: <span class="s">"100000"</span>,
+  <span class="k">"token"</span>: <span class="s">"USDC"</span>,
+  <span class="k">"memo"</span>: <span class="s">"API subscription"</span>,
+  <span class="k">"from"</span>: <span class="s">"0xYourAtom…"</span>
+}</div>
+      </div>
+      <div class="card">
+        <h4>Proposal URL</h4>
+        <p style="margin-top:12px;">The JSON is <span class="mono" style="color:var(--text)">base64url</span>-encoded and attached to the wallet host:</p>
+        <div class="code mono" style="margin-top:12px;padding:18px;word-break:break-all;font-size:12px;line-height:1.7;">
+https://qoin.io/wallet.html#<br>w=<span class="v">atom</span>&amp;tx=<span class="c">eyJ2IjoxLCJjaGFpbiI6…</span>
+        </div>
+        <p style="margin-top:16px;font-size:13px;">Send it over any channel — Telegram, email, SMS, WhatsApp. The link carries no secret; interception is harmless.</p>
+      </div>
+    </div>
+
+    <div class="callout" style="margin-top:32px;">
+      <div class="section-label">What agents can and cannot do</div>
+      <p style="color:var(--text);margin-bottom:10px;"><strong>Can:</strong> read balances and transaction history (public blockchain data), construct arbitrary transactions, send you proposal links, sign the proposal with their own key for provenance.</p>
+      <p style="color:var(--text);"><strong>Cannot:</strong> sign on your behalf, move money without a human tap, create wallets, learn your private key, see your other wallets.</p>
+    </div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="wrap">
+    <div class="section-label">Security</div>
+    <h2 style="margin-bottom:12px;">What Qoin protects you from. And what it doesn't.</h2>
+    <p style="max-width:640px;margin-bottom:40px;">This is a wallet, not a bank. The honesty of that framing is the whole security model.</p>
+
+    <div class="pros-cons">
+      <div class="card protect">
+        <h4>Protected</h4>
+        <ul>
+          <li>Phishing sites copying Qoin's HTML — passkeys are bound to origin.</li>
+          <li>Network interception of proposal links — the link contains no secret.</li>
+          <li>Compromised agents — an agent can propose but not sign.</li>
+          <li>Seed-phrase theft — there is no seed phrase to steal.</li>
+          <li>Cloud breaches — there is no cloud. Keys live only in Secure Enclave.</li>
+          <li>One wallet leaking to another — each wallet is siloed by derivation.</li>
+        </ul>
+      </div>
+      <div class="card noprotect">
+        <h4>Not protected</h4>
+        <ul>
+          <li>Losing your iPhone and wiping iCloud. There is no recovery.</li>
+          <li>Someone with your face and your unlocked iPhone.</li>
+          <li>Proposals you approve without reading. The details are shown — read them.</li>
+          <li>Bugs in the HTML you loaded. Audit the file before trusting real money.</li>
+          <li>Malicious mirrors at look-alike domains. The domain is the wallet's identity.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pull" style="margin-top:56px;">You trust Apple's Secure Enclave. You trust the HTML file you loaded. You trust <span class="accent">no agent</span>, no server, no cloud, no person.</div>
+  </div>
+</section>
+
+<section id="spec">
+  <div class="wrap-narrow">
+    <div class="section-label">Specification</div>
+    <h2 style="margin-bottom:32px;">v0.1 alpha</h2>
+
+    <div class="spec">
+      <div class="row"><div class="k">Version</div><div class="v">0.1 alpha <span class="mono faint" style="margin-left:8px;">— expect changes</span></div></div>
+      <div class="row"><div class="k">Wallet type</div><div class="v">Standard Ethereum EOA (Externally Owned Account)</div></div>
+      <div class="row"><div class="k">Signing key</div><div class="v">secp256k1, derived per wallet from WebAuthn PRF</div></div>
+      <div class="row"><div class="k">Key derivation</div><div class="v"><span class="mono">HMAC-SHA256(passkey, "qoin-eth-v1:" + walletName)</span></div></div>
+      <div class="row"><div class="k">Chains supported</div><div class="v">Ethereum mainnet, Base <span class="dim">— same address on both</span></div></div>
+      <div class="row"><div class="k">Native assets</div><div class="v">ETH on both chains</div></div>
+      <div class="row"><div class="k">Tokens</div>
+        <div class="v">
+          USDC — native on Ethereum and Base<br>
+          USDT — native on Ethereum; <span class="dim">bridged on Base (not issued by Tether)</span><br>
+          <span class="dim">Arbitrary ERC-20 by contract address</span>
+        </div>
+      </div>
+      <div class="row"><div class="k">Browsers</div><div class="v">iOS 18+ Safari, recent Chrome/Edge with platform authenticator (Face ID, Touch ID, Windows Hello)</div></div>
+      <div class="row"><div class="k">Hosting</div><div class="v">Any HTTPS static host. Single HTML file.</div></div>
+      <div class="row"><div class="k">Backend</div><div class="v">None. Public RPC for reads; user signs locally; broadcasts directly.</div></div>
+      <div class="row"><div class="k">Recovery</div><div class="v">None by design. iCloud Keychain passkey sync is Apple's, not Qoin's.</div></div>
+      <div class="row"><div class="k">Dependencies</div><div class="v">ethers.js (UMD, CDN) and Inter font (CDN)</div></div>
+      <div class="row"><div class="k">License</div><div class="v">MIT</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-label">Features in v0.1 alpha</div>
+    <h2 style="margin-bottom:40px;">What works today.</h2>
+
+    <div class="cards three-up">
+      <div class="card">
+        <h4>Face ID setup</h4>
+        <p>One-tap passkey creation, bound to the hosting origin. No passwords, no seed phrases.</p>
+      </div>
+      <div class="card">
+        <h4>Multi-wallet</h4>
+        <p>Unlimited named wallets derived from the same Face ID. Each is a separate Ethereum address.</p>
+      </div>
+      <div class="card">
+        <h4>Send ETH</h4>
+        <p>Native ETH on Ethereum and Base. Manual send flow with chain picker, amount, and memo.</p>
+      </div>
+      <div class="card">
+        <h4>Send stablecoins</h4>
+        <p>USDC and USDT on both supported chains. Non-standard ERC-20 behavior handled correctly.</p>
+      </div>
+      <div class="card">
+        <h4>Receive anything</h4>
+        <p>Every wallet shows its address. Standard Ethereum inbound — no action required from you.</p>
+      </div>
+      <div class="card">
+        <h4>Balance reading</h4>
+        <p>Live balances for ETH, USDC, USDT on Ethereum and Base via public RPC. No API keys.</p>
+      </div>
+      <div class="card">
+        <h4>Agent proposal links</h4>
+        <p>URL-based protocol. Agents build JSON, encode base64url, send a link. You tap and sign.</p>
+      </div>
+      <div class="card">
+        <h4>Proposal builder</h4>
+        <p>Inside the wallet, create proposal URLs to share or test. Share via native iOS share sheet.</p>
+      </div>
+      <div class="card">
+        <h4>Block explorer links</h4>
+        <p>Every wallet links out to Etherscan and Basescan for full transaction history.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="wrap-narrow">
+    <div class="section-label">On the way</div>
+    <h2 style="margin-bottom:24px;">Not in v0.1.</h2>
+    <p>Alpha means the surface is locked but the edges are soft. These are the obvious next steps, in rough order:</p>
+    <div class="spec" style="margin-top:32px;">
+      <div class="row"><div class="k">v0.2</div><div class="v">More chains (Arbitrum, OP, Polygon). More tokens. QR codes for receive.</div></div>
+      <div class="row"><div class="k">v0.3</div><div class="v">Agent signature verification. Rate limits per wallet. Optional spending caps.</div></div>
+      <div class="row"><div class="k">v0.4</div><div class="v">In-app transaction history. Address book. Cross-wallet transfers.</div></div>
+      <div class="row"><div class="k">v1.0</div><div class="v">Production-hardened. Audited. Published with file-hash anchoring for integrity.</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="open">
+  <div class="wrap-narrow">
+    <div class="section-label">Open source</div>
+    <h2>Audit, fork, mirror, host.</h2>
+    <p class="lead" style="margin-top:24px;">Qoin is MIT-licensed and lives at <a href="https://github.com/g0rd33v/qoin" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">github.com/g0rd33v/qoin</a>. Read the source before you trust it with real money. Pin a specific commit hash if you want the HTML to be exactly the version you reviewed. Mirror it on your own domain if you prefer — just note that wallets are bound to origin, so a new domain creates new addresses.</p>
+    <div class="cta-row" style="justify-content:flex-start;margin-top:32px;">
+      <a href="https://github.com/g0rd33v/qoin" target="_blank" rel="noopener" class="btn">View repository</a>
+      <a href="https://github.com/g0rd33v/qoin/blob/main/wallet.html" target="_blank" rel="noopener" class="btn">Read wallet.html</a>
+    </div>
+  </div>
+</section>
+
+<section style="border-bottom:none;padding:64px 24px 96px;">
+  <div class="wrap-narrow" style="text-align:center;">
+    <h2>Open the wallet.</h2>
+    <p class="lead" style="margin:20px 0 40px;">One HTML file. Your face is the key. Works on any iPhone with iOS 18 or later.</p>
+    <div class="cta-row">
+      <a href="./wallet.html" class="btn primary">Launch Qoin <span class="arrow">→</span></a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="links">
+    <a href="https://github.com/g0rd33v/qoin" target="_blank" rel="noopener">GitHub</a>
+    <a href="./wallet.html">Wallet</a>
+    <a href="https://labs.vc" target="_blank" rel="noopener">Labs</a>
+  </div>
+  <div class="mono">QOIN · v0.1 ALPHA · MIT</div>
+</footer>
+
+</body>
+</html>
